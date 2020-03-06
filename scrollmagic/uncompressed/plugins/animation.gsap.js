@@ -28,14 +28,14 @@
 (function (root, factory) {
 	if (typeof define === 'function' && define.amd) {
 		// AMD. Register as an anonymous module.
-		define(['ScrollMagic', 'gsap', 'TweenMax', 'TimelineMax'], factory);
+		define(['ScrollMagic', 'gsap'], factory);
 	} else if (typeof exports === 'object') {
 		// CommonJS
 		// Loads whole gsap package onto global scope.
 		var gsap = require("gsap/dist/gsap") || require("gsap");
 
 		// TweenMax/TimelineMax will be global in v2. In v3, they will be on the gsap object
-		factory(require('scrollmagic'), gsap, TweenMax || gsap, TimelineMax || gsap);
+		factory(require('scrollmagic'), gsap, window.TweenMax || gsap, window.TimelineMax || gsap);
 	} else {
 		// Browser globals
 		factory(root.ScrollMagic || (root.jQuery && root.jQuery.ScrollMagic), root.gsap, root.gsap || root.TweenMax || root.TweenLite, root.gsap || root.TimelineMax || root.TimelineLite);
@@ -43,7 +43,7 @@
 }(this, function (ScrollMagic, Gsap, Tween, Timeline) {
 	"use strict";
 	var NAMESPACE = "animation.gsap";
-	var GSAP3_OR_GREATER = Gsap && parseFloat(Gsap.version) >= 3;
+	var GSAP3_OR_GREATER = Gsap && parseFloat(Gsap.gsap.version) >= 3;
 
 	var
 		console = window.console || {},
@@ -51,6 +51,7 @@
 	if (!ScrollMagic) {
 		err("(" + NAMESPACE + ") -> ERROR: The ScrollMagic main module could not be found. Please make sure it's loaded before this plugin or use an asynchronous loader like requirejs.");
 	}
+	if (GSAP3_OR_GREATER) Tween = gsap.core.Tween;
 	if (!Tween) {
 		err("(" + NAMESPACE + ") -> ERROR: TweenLite or TweenMax could not be found. Please make sure GSAP is loaded before ScrollMagic or use an asynchronous loader like requirejs.");
 	}
@@ -272,28 +273,28 @@
 			}
 
 			// warn about tween overwrites, when an element is tweened multiple times
-			if (parseFloat(TweenLite.version) >= 1.14) { // onOverwrite only present since GSAP v1.14.0
-				var
-					// However, onInterrupt deprecated onOverwrite in GSAP v3
-					methodUsed = GSAP3_OR_GREATER ? 'onInterrupt' : 'onOverwrite',
-					list = _tween.getChildren ? _tween.getChildren(true, true, false) : [_tween], // get all nested tween objects
-					newCallback = function () {
-						log(2, "WARNING: tween was overwritten by another. To learn how to avoid this issue see here: https://github.com/janpaepke/ScrollMagic/wiki/WARNING:-tween-was-overwritten-by-another");
+			// if (parseFloat(TweenLite.version) >= 1.14) { // onOverwrite only present since GSAP v1.14.0
+			var
+				// However, onInterrupt deprecated onOverwrite in GSAP v3
+				methodUsed = GSAP3_OR_GREATER ? 'onInterrupt' : 'onOverwrite',
+				list = _tween.getChildren ? _tween.getChildren(true, true, false) : [_tween], // get all nested tween objects
+				newCallback = function () {
+					log(2, "WARNING: tween was overwritten by another. To learn how to avoid this issue see here: https://github.com/janpaepke/ScrollMagic/wiki/WARNING:-tween-was-overwritten-by-another");
+				};
+			for (var i = 0, thisTween, oldCallback; i < list.length; i++) {
+				/*jshint loopfunc: true */
+				thisTween = list[i];
+				if (oldCallback !== newCallback) { // if tweens is added more than once
+					oldCallback = thisTween.vars[methodUsed];
+					thisTween.vars[methodUsed] = function () {
+						if (oldCallback) {
+							oldCallback.apply(this, arguments);
+						}
+						newCallback.apply(this, arguments);
 					};
-				for (var i = 0, thisTween, oldCallback; i < list.length; i++) {
-					/*jshint loopfunc: true */
-					thisTween = list[i];
-					if (oldCallback !== newCallback) { // if tweens is added more than once
-						oldCallback = thisTween.vars[methodUsed];
-						thisTween.vars[methodUsed] = function () {
-							if (oldCallback) {
-								oldCallback.apply(this, arguments);
-							}
-							newCallback.apply(this, arguments);
-						};
-					}
 				}
 			}
+			// }
 			log(3, "added tween");
 
 			updateTweenProgress();
